@@ -152,7 +152,11 @@ output, see
 ### Grouped import for generated cases (opt-in)
 
 Use these flags to put many generated graphs into a small number of sweeps.
-Without them, `import_graph.py` behaves as described above.
+A **sweep** is one graph template (`graph.template.json`) plus a list of cases
+(`sweep.json`). The **skeleton hash** is the structural fingerprint of a graph
+(node types, wiring and tensor set); graphs with the same skeleton hash can
+share a sweep. Without these flags, `import_graph.py` behaves as described
+above.
 
 ```bash
 python3 migration-scripts/import_graph.py \

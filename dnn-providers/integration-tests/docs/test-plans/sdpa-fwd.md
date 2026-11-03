@@ -1,8 +1,9 @@
 # SDPA Forward Test Plan: How the Cases Were Derived
 
-> These test cases were generated from a PoC but they have already shown value in
-> revealing defects in SDPA engines and are therefore being treated as an initial
-> set while the specific approach is reviewed and finalized.
+> A proof of concept (PoC) generated these test cases. A PoC is a first working
+> version, made to show that a method works. The cases have already found defects
+> in SDPA engines. So we use them as a first set while the method is reviewed and
+> finalized.
 
 This document tells how the SDPA forward plan cases were made. It starts from
 everything the operation could vary. It ends with the bundles that the
@@ -18,11 +19,29 @@ The files that this document describes are:
 | [`test-plans/sdpa-fwd/injections.yaml`](../../test-plans/sdpa-fwd/injections.yaml) | The cases that are added on purpose, outside the generated sets. |
 | [`test-plans/sdpa-fwd/timings-gfx942.csv`](../../test-plans/sdpa-fwd/timings-gfx942.csv), [`timings-gfx950.csv`](../../test-plans/sdpa-fwd/timings-gfx950.csv) | The measured time of each case on one GPU. |
 | [`test-plans/sdpa-fwd/levels.csv.sha256`](../../test-plans/sdpa-fwd/levels.csv.sha256) | The SHA-256 of the generated CSV. |
+| [`test-plans/sdpa-fwd/levels.csv`](../../test-plans/sdpa-fwd/levels.csv) | A copy of the generated CSV, so that you can compare your file with it. No tool reads it. |
 | [`scripts/sdpa_case_flow_poc/`](../../scripts/sdpa_case_flow_poc/README.md) | The generator: it turns the files above into the CSV. |
 | `integration-test-bundles/<tier>/SdpaFwdPlan/<Topology>/` | The bundles: one sweep per tier and topology. They are not on this branch; the pipeline in [`scripts/sdpa_case_flow_poc/README.md`](../../scripts/sdpa_case_flow_poc/README.md#from-the-csv-to-bundles) makes them. |
 
-The CSV of all cases is not stored in the repository. The generator makes it
-from the files above (section 8). The generator is a proof of concept (PoC).
+The generator makes the CSV of all cases from the files above (section 8). The
+repository also holds a copy of that CSV, only for comparison. The generator is
+a PoC.
+
+### Words used in this document
+
+| Word | Meaning |
+|---|---|
+| tensor | A multi-dimensional array of numbers, for example a 4-D array of size batch × heads × length × head size. |
+| CSV | A text table: one line per row, with commas between the fields. |
+| YAML, JSON, TOML | Three text formats for structured data. The model files are YAML, the graphs are JSON, the engine configuration files are TOML. |
+| SHA-256 | A 64-digit hex number computed from the bytes of a file. If one byte changes, the number changes. Two files with the same SHA-256 are the same file. |
+| hex | Base-16 numbers, written with the digits `0`-`9` and `a`-`f`. |
+| arch | The GPU architecture name, for example `gfx942` or `gfx950`. |
+| fp8, bf16, fp16, fp32 | Number formats of 8, 16, 16 and 32 bits. fp8 has variants, for example E4M3 (4 exponent bits, 3 mantissa bits). |
+| descale | A factor that turns stored fp8 numbers back into their real values. |
+| BHSD, BSHD | The order of the dimensions of a tensor in memory: B batch, H heads, S sequence length, D head size. |
+| CTest, GTest | CTest is the test runner of CMake. GTest (GoogleTest) is the C++ test framework of the suite. |
+| plugin | A shared library that hipDNN loads at run time. A provider plugin holds one or more engines. |
 
 ## Contents
 
@@ -363,8 +382,10 @@ name.
 
 ## 8. The CSV
 
-The CSV of all cases is generated. It is not stored in the repository. Run the
-generator to make it (section 12). The generator writes `levels.csv`.
+The CSV of all cases is generated. Run the generator to make it (section 12).
+The generator writes `levels.csv`. The repository holds a copy at
+[`test-plans/sdpa-fwd/levels.csv`](../../test-plans/sdpa-fwd/levels.csv), so
+that you can compare your file with it. No tool reads that copy.
 
 The same input files and the same seed always give the same file, byte for
 byte. Its SHA-256 is in
@@ -373,7 +394,8 @@ byte. Its SHA-256 is in
 A CTest test, `hipdnn_sdpa_fwd_levels_regenerate_python_tests`, makes the CSV
 again and compares its SHA-256 with that file. When a change to the model, the
 timing files or the generator changes the CSV, write the new SHA-256 to that
-file in the same change.
+file, and copy the new CSV to `test-plans/sdpa-fwd/levels.csv`, in the same
+change.
 
 `levels.csv` has one row per case: 16,729 rows. It has no quoted fields. A `-`
 means that a child axis is not active in that row. Each row has 92 columns: 13
@@ -423,7 +445,7 @@ yet. It stays in the generated CSV, and the selection step
 | `descale_lists` | A per-head or finer descale is a list of factors in device memory. | 950 |
 | `tensor_overlap` | Two tensors that share memory need control of the pointers, which a bundle does not have. | 540 |
 | `arch_dtype` | The number format depends on the GPU (for example fp8 E4M3 becomes E4M3 FNUZ on gfx942), and one graph has one format. | 323 |
-| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change that is not on the base branch yet (PR #14709). Only the selection step removes these rows. | 182 (6 otherwise expressible) |
+| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change (PR #14709). These rows are left out of this bundle set. Adding them is planned as a follow-up change. Only the selection step removes these rows. | 182 (6 otherwise expressible) |
 | `dropout_without_rng_dump` | Random dropout without an `rng_dump` output has no oracle: the references check random dropout only through the dumped mask. | 44 (8 otherwise expressible) |
 
 9,883 rows became bundles. 6,846 rows are excluded. The selection step never
@@ -442,13 +464,16 @@ the filter and regenerate the bundles.
 
 The PoC graph builder (`src/sdpa-case-flow-poc/CaseGraph.cpp`, run by
 `hipdnn_sdpa_case_flow_runner --export-graphs`) makes the graphs. The
+discovery program `hipdnn_sdpa_case_flow_discovery` uses the same graph
+builder; the README of the generator tells what each program is for
+([The two C++ programs](../../scripts/sdpa_case_flow_poc/README.md#the-two-c-programs)). The
 `"generator": "hipdnn_sdpa_case_flow_runner"` field in each case's metadata
 names this graph builder.
 
 1. The PoC graph builder reads the row and the class-to-value table, and makes
    concrete sizes, strides, formats and attributes.
 2. It builds the graph with the hipDNN frontend and calls `validate()`.
-3. It serializes the graph to JSON with `Graph::to_json()`. This is the same
+3. It writes the graph as JSON text with `Graph::to_json()`. This is the same
    converter that the suite's graph capture uses. No GPU is needed.
 
 The graphs exported for gfx942 and for gfx950 are byte-identical for every
@@ -684,9 +709,18 @@ sha256sum <output folder>/levels.csv
 
 The test `scripts/test_sdpa_fwd_levels_regenerate.py` runs these two steps.
 
+You can also compare your file with the committed copy, byte for byte. Run
+this from `dnn-providers/integration-tests/scripts`. `cmp` prints nothing when
+the files are the same:
+
+```bash
+cmp <output folder>/levels.csv ../test-plans/sdpa-fwd/levels.csv
+```
+
 **The bundles.** The steps that turn CSV rows into bundles (sections 9.1 to 9.4)
 are in [`scripts/sdpa_case_flow_poc/README.md`](../../scripts/sdpa_case_flow_poc/README.md#from-the-csv-to-bundles).
 The bundles under `SdpaFwdPlan` are not on this branch; those steps make them.
+The last step compares your bundles with ours.
 
 After a change to the bundle tree, run `scripts/verify_support_claims.py` and
 regenerate `SUPPORT_MATRIX_OVERVIEW.md` with
