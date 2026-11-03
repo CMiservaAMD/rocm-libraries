@@ -411,6 +411,18 @@ add_integration_test_target(${GOLDEN_DATA_TESTS_EXE} ${CMAKE_CURRENT_BINARY_DIR}
 
 add_subdirectory(src/integration-tests)
 
+option(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC
+       "Build the SDPA case-flow discovery driver (proof of concept, acceptance queries only)" OFF)
+if(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC)
+    add_subdirectory(src/sdpa-case-flow-poc)
+endif()
+
+option(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER
+       "Build the SDPA case-flow runner (proof of concept: execute, reference, compare, time)" OFF)
+if(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER)
+    add_subdirectory(src/sdpa-case-flow-runner)
+endif()
+
 target_include_directories(${INTEGRATION_TESTS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(${INTEGRATION_TESTS_EXE} SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/argparse

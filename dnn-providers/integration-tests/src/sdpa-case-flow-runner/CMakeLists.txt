@@ -1,0 +1,62 @@
+# Copyright © Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier:  MIT
+
+if(NOT HIPDNN_ENABLE_SDPA)
+    message(FATAL_ERROR
+        "HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER needs hipDNN built with HIPDNN_ENABLE_SDPA=ON")
+endif()
+
+set(SDPA_CASE_FLOW_RUNNER_EXE hipdnn_sdpa_case_flow_runner)
+set(_it_src ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+set(_runner_hash_header ${CMAKE_CURRENT_BINARY_DIR}/generated/RunnerSourceHash.hpp)
+add_custom_command(
+    OUTPUT ${_runner_hash_header}
+    COMMAND ${CMAKE_COMMAND}
+        -DOUTPUT=${_runner_hash_header}
+        -DSOURCE_1=${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
+        -DSOURCE_2=${_it_src}/sdpa-case-flow-poc/CaseGraph.cpp
+        -DSOURCE_3=${_it_src}/sdpa-case-flow-poc/CaseGraph.hpp
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/GenerateSourceHash.cmake
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
+        ${_it_src}/sdpa-case-flow-poc/CaseGraph.cpp
+        ${_it_src}/sdpa-case-flow-poc/CaseGraph.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/GenerateSourceHash.cmake
+    COMMENT "Hashing the SDPA case-flow runner sources"
+    VERBATIM
+)
+
+add_executable(${SDPA_CASE_FLOW_RUNNER_EXE}
+    Main.cpp
+    ${_runner_hash_header}
+    ${_it_src}/sdpa-case-flow-poc/CaseGraph.cpp
+    ${_it_src}/harness/bundle/OutputComparison.cpp
+    ${_it_src}/harness/input-init/FillInputs.cpp
+    ${_it_src}/harness/input-init/SdpaBackwardInputs.cpp
+)
+
+target_include_directories(${SDPA_CASE_FLOW_RUNNER_EXE}
+    PRIVATE
+        ${_it_src}
+        ${_it_src}/sdpa-case-flow-poc
+        ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
+
+target_link_libraries(${SDPA_CASE_FLOW_RUNNER_EXE}
+    PRIVATE
+        hip::host
+        hipdnn_gpu_ref
+        hipdnn_test_sdk
+        hipdnn_plugin_sdk
+        Threads::Threads
+)
+
+# Warnings are reported but do not fail the build.
+target_compile_options(${SDPA_CASE_FLOW_RUNNER_EXE}
+    PRIVATE ${INTEGRATION_TESTS_WARNING_COMPILE_OPTIONS} -Wno-error)
+
+set_target_properties(${SDPA_CASE_FLOW_RUNNER_EXE}
+    PROPERTIES
+        BUILD_RPATH_USE_ORIGIN TRUE
+)
