@@ -462,8 +462,8 @@ are byte-identical, and how many are identical after it replaces every
 code 0) or `RESULT MISMATCH` (exit code 1). `--report` also writes the names of
 the files that differ.
 
-**The one expected difference.** A match means `RESULT MATCH` with
-`different=0`. The only expected difference is the `generator_version` value
+**The expected differences.** A match means `RESULT MATCH` with
+`different=0`. Two differences are expected. The first is the `generator_version` value
 in each case of each `sweep.json`:
 
 - Our bundles carry `fadf8dc7c3ba`.
@@ -482,3 +482,11 @@ made our bundles, these source files changed:
 None of these changes the exported graphs. But they change the source files, so
 they change `generator_version`. Every other byte of your set is expected to be
 equal to ours.
+
+**The second expected difference: one full-tier case.** Our bundles in the
+commit above were made when targeted case X10 had 2 batches of 128 heads. This
+branch's model gives X10 2 batches of 96 heads, because the GPU reference cannot
+yet launch the larger case (ALMIOPEN-3134). So one case in
+`full/SdpaFwdPlan/DqBv_DkBv_DvBv/sweep.json` differs: our case `154b79b7…` is
+replaced by `63728df7…`. `compare_bundle_trees.py` reports that one file as
+different. Every other case is expected to match.
