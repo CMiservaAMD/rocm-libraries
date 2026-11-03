@@ -19,7 +19,7 @@ The files that this document describes are:
 | [`test-plans/sdpa-fwd/timings-gfx942.csv`](../../test-plans/sdpa-fwd/timings-gfx942.csv), [`timings-gfx950.csv`](../../test-plans/sdpa-fwd/timings-gfx950.csv) | The measured time of each case on one GPU. |
 | [`test-plans/sdpa-fwd/levels.csv.sha256`](../../test-plans/sdpa-fwd/levels.csv.sha256) | The SHA-256 of the generated CSV. |
 | [`scripts/sdpa_case_flow_poc/`](../../scripts/sdpa_case_flow_poc/README.md) | The generator: it turns the files above into the CSV. |
-| `integration-test-bundles/<tier>/SdpaFwdPlan/<Topology>/` | The bundles: one sweep per tier and topology. |
+| `integration-test-bundles/<tier>/SdpaFwdPlan/<Topology>/` | The bundles: one sweep per tier and topology. They are not on this branch; the pipeline in [`scripts/sdpa_case_flow_poc/README.md`](../../scripts/sdpa_case_flow_poc/README.md#from-the-csv-to-bundles) makes them. |
 
 The CSV of all cases is not stored in the repository. The generator makes it
 from the files above (section 8). The generator is a proof of concept (PoC).
@@ -333,8 +333,8 @@ Rules that keep a tier small:
   tier's shapes, ceiling, labels and change limit.
 - **Cost.** The time of a case comes from a per-case timing file
   (`timings-gfx942.csv`, `timings-gfx950.csv`). The times were measured on
-  one gfx942 node and one gfx950 node with the PoC runner (not in this
-  repository). A case that was not
+  one gfx942 node and one gfx950 node with the PoC runner
+  (`src/sdpa-case-flow-runner/`). A case that was not
   measured gets a fitted estimate: a + b × MFLOP + c × tensor-MB. Each tier
   run adds 10 s of overhead. gfx942 is the budget basis.
 - **Over budget.** The script only reports; it does not move cases.
@@ -349,7 +349,7 @@ Result for the generated CSV (section 8; times are the summed
 | comprehensive | 3,080 | 11,192 | 1,624.5 | 1,353.1 | 45.1 % |
 | full | 5,537 | 16,729 | 4,823.2 | 3,800.4 | — |
 
-These times are the PoC runner's times (not in this repository) for one engine
+These times are the PoC runner's times (`src/sdpa-case-flow-runner/`) for one engine
 run plus one reference run. The suite does more work per case, so its times are larger.
 
 **Seeds.** The script completes each of the 15 seeds with the fewest changes
@@ -410,8 +410,8 @@ A **bundle** is a graph test in `integration-test-bundles/`. A **sweep** is a
 
 A bundle holds a graph and, for each case, a few fixed values. It cannot hold
 exact tensor contents. So a row that needs exact contents cannot be a bundle
-yet. It stays in the generated CSV, and the selection step (not in this
-repository) skips it for the reasons below. A row can have several reasons.
+yet. It stays in the generated CSV, and the selection step
+(`scripts/sdpa_case_flow_poc/bundles/select_rows.py`) skips it for the reasons below. A row can have several reasons.
 
 | Reason | Why a bundle cannot express it | Rows |
 |---|---|---|
@@ -423,11 +423,10 @@ repository) skips it for the reasons below. A row can have several reasons.
 | `descale_lists` | A per-head or finer descale is a list of factors in device memory. | 950 |
 | `tensor_overlap` | Two tensors that share memory need control of the pointers, which a bundle does not have. | 540 |
 | `arch_dtype` | The number format depends on the GPU (for example fp8 E4M3 becomes E4M3 FNUZ on gfx942), and one graph has one format. | 323 |
-| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change that is not on the base branch yet (PR #14709). Only the selection step (not in this repository) removes these rows. | 182 (6 otherwise expressible) |
+| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change that is not on the base branch yet (PR #14709). Only the selection step removes these rows. | 182 (6 otherwise expressible) |
 | `dropout_without_rng_dump` | Random dropout without an `rng_dump` output has no oracle: the references check random dropout only through the dumped mask. | 44 (8 otherwise expressible) |
 
-9,883 rows became bundles. 6,846 rows are excluded. The selection step (not in
-this repository) never
+9,883 rows became bundles. 6,846 rows are excluded. The selection step never
 changes the model or the generated rows. It only filters. To bring a row back, change
 the filter and regenerate the bundles.
 
@@ -441,7 +440,8 @@ the filter and regenerate the bundles.
 
 ### 9.2 How a graph is made from a row
 
-The PoC graph builder (not in this repository) makes the graphs. The
+The PoC graph builder (`src/sdpa-case-flow-poc/CaseGraph.cpp`, run by
+`hipdnn_sdpa_case_flow_runner --export-graphs`) makes the graphs. The
 `"generator": "hipdnn_sdpa_case_flow_runner"` field in each case's metadata
 names this graph builder.
 
@@ -506,7 +506,8 @@ of `values` is on its own line, and each tensor is on its own line.
   and `generated_from_sha256` (the SHA-256 of the generated CSV). Use
   `case_key` to find the row in the generated CSV (section 8).
 - **`cases.csv`**: `reference_source` names `test-plans/sdpa-fwd/cases.csv`.
-  That file is not in this repository. It is `levels.csv` with five columns
+  That file is not stored in the repository;
+  `scripts/sdpa_case_flow_poc/bundles/annotate_csv.py` writes it. It is `levels.csv` with five columns
   added at the end of each row: `topology`, `bundle_status`,
   `exclusion_reasons`, `bundle_path` and `gtest_name`. Remove these five
   columns and you get `levels.csv` byte for byte. Its rows have the same
@@ -683,9 +684,9 @@ sha256sum <output folder>/levels.csv
 
 The test `scripts/test_sdpa_fwd_levels_regenerate.py` runs these two steps.
 
-**The bundles.** The step that turns CSV rows into bundles (sections 9.1 to 9.4)
-is not part of this repository yet. The bundles under `SdpaFwdPlan` are
-committed as they are.
+**The bundles.** The steps that turn CSV rows into bundles (sections 9.1 to 9.4)
+are in [`scripts/sdpa_case_flow_poc/README.md`](../../scripts/sdpa_case_flow_poc/README.md#from-the-csv-to-bundles).
+The bundles under `SdpaFwdPlan` are not on this branch; those steps make them.
 
 After a change to the bundle tree, run `scripts/verify_support_claims.py` and
 regenerate `SUPPORT_MATRIX_OVERVIEW.md` with
