@@ -433,14 +433,14 @@ arches.
 
 ### 10. Compare your bundles with ours
 
-Our bundles are in commit `cb5776293bf2ba950fc5fd443535b0c1b597149e` of
+Our bundles are in commit `3fb4834159ed88c202e3c923ec832ea8358832dc` of
 [ROCm/rocm-libraries](https://github.com/ROCm/rocm-libraries), on the branch
 `users/cmiserva/almiopen-2893/sdpa-fwd-integration-tests-plan-bundles`. You do
 not need the whole branch. Fetch that one commit, then extract only the four
 `SdpaFwdPlan` folders with `git archive`:
 
 ```bash
-OURS=cb5776293bf2ba950fc5fd443535b0c1b597149e
+OURS=3fb4834159ed88c202e3c923ec832ea8358832dc
 git -C $REPO fetch https://github.com/ROCm/rocm-libraries.git $OURS
 mkdir -p $OUT/ours
 git -C $REPO archive $OURS \
@@ -462,8 +462,8 @@ are byte-identical, and how many are identical after it replaces every
 code 0) or `RESULT MISMATCH` (exit code 1). `--report` also writes the names of
 the files that differ.
 
-**The expected differences.** A match means `RESULT MATCH` with
-`different=0`. Two differences are expected. The first is the `generator_version` value
+**The one expected difference.** A match means `RESULT MATCH` with
+`different=0`. The only expected difference is the `generator_version` value
 in each case of each `sweep.json`:
 
 - Our bundles carry `fadf8dc7c3ba`.
@@ -482,11 +482,3 @@ made our bundles, these source files changed:
 None of these changes the exported graphs. But they change the source files, so
 they change `generator_version`. Every other byte of your set is expected to be
 equal to ours.
-
-**The second expected difference: one full-tier case.** Our bundles in the
-commit above were made when targeted case X10 had 2 batches of 128 heads. This
-branch's model gives X10 2 batches of 96 heads, because the GPU reference cannot
-yet launch the larger case (ALMIOPEN-3134). So one case in
-`full/SdpaFwdPlan/DqBv_DkBv_DvBv/sweep.json` differs: our case `154b79b7…` is
-replaced by `63728df7…`. `compare_bundle_trees.py` reports that one file as
-different. Every other case is expected to match.
