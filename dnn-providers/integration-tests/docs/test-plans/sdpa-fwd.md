@@ -16,12 +16,13 @@ The files that this document describes are:
 | [`test-plans/sdpa-fwd/model.yaml`](../../test-plans/sdpa-fwd/model.yaml) | The model: the settings, their values, the labels, the tier recipe. |
 | [`test-plans/sdpa-fwd/rules.yaml`](../../test-plans/sdpa-fwd/rules.yaml) | The rules that remove combinations. |
 | [`test-plans/sdpa-fwd/injections.yaml`](../../test-plans/sdpa-fwd/injections.yaml) | The cases that are added on purpose, outside the generated sets. |
-| [`test-plans/sdpa-fwd/cases.csv`](../../test-plans/sdpa-fwd/cases.csv) | Every generated case (16,729 rows), with its tier, its topology, and whether it became a bundle. |
+| [`test-plans/sdpa-fwd/timings-gfx942.csv`](../../test-plans/sdpa-fwd/timings-gfx942.csv), [`timings-gfx950.csv`](../../test-plans/sdpa-fwd/timings-gfx950.csv) | The measured time of each case on one GPU. |
+| [`test-plans/sdpa-fwd/levels.csv.sha256`](../../test-plans/sdpa-fwd/levels.csv.sha256) | The SHA-256 of the generated CSV. |
+| [`scripts/sdpa_case_flow_poc/`](../../scripts/sdpa_case_flow_poc/README.md) | The generator: it turns the files above into the CSV. |
 | `integration-test-bundles/<tier>/SdpaFwdPlan/<Topology>/` | The bundles: one sweep per tier and topology. |
 
-The tool that turns the model into the CSV is a local proof-of-concept (PoC)
-tool. It is not part of the repository. Section 12 tells what it does, so that
-a reader can check the CSV against the model.
+The CSV of all cases is not stored in the repository. The generator makes it
+from the files above (section 8). The generator is a proof of concept (PoC).
 
 ## Contents
 
@@ -330,13 +331,15 @@ Rules that keep a tier small:
 - **Fill.** If a tier has spare time, the script pulls cases down from higher
   tiers until the tier uses 50 % of its budget. A pulled case must fit the
   tier's shapes, ceiling, labels and change limit.
-- **Cost.** The time of a case comes from a per-case timing file, measured on
-  one gfx942 node and one gfx950 node with the PoC runner. A case that was not
+- **Cost.** The time of a case comes from a per-case timing file
+  (`timings-gfx942.csv`, `timings-gfx950.csv`). The times were measured on
+  one gfx942 node and one gfx950 node with the PoC runner (not in this
+  repository). A case that was not
   measured gets a fitted estimate: a + b × MFLOP + c × tensor-MB. Each tier
   run adds 10 s of overhead. gfx942 is the budget basis.
 - **Over budget.** The script only reports; it does not move cases.
 
-Result for the committed CSV (from `cases.csv`; times are the summed
+Result for the generated CSV (section 8; times are the summed
 `est_seconds` columns plus the overhead):
 
 | Tier | Cases in this tier | Cumulative cases | Cumulative s, gfx942 | Cumulative s, gfx950 | Budget use, gfx942 |
@@ -346,8 +349,8 @@ Result for the committed CSV (from `cases.csv`; times are the summed
 | comprehensive | 3,080 | 11,192 | 1,624.5 | 1,353.1 | 45.1 % |
 | full | 5,537 | 16,729 | 4,823.2 | 3,800.4 | — |
 
-These times are the PoC runner's times for one engine run plus one reference
-run. The suite does more work per case, so its times are larger.
+These times are the PoC runner's times (not in this repository) for one engine
+run plus one reference run. The suite does more work per case, so its times are larger.
 
 **Seeds.** The script completes each of the 15 seeds with the fewest changes
 under the rules and the answer-key rules. A seed whose row the references can
@@ -360,14 +363,27 @@ name.
 
 ## 8. The CSV
 
-`cases.csv` has one row per case: 16,729 rows. It has no quoted fields. A `-`
-means that a child axis is not active in that row.
+The CSV of all cases is generated. It is not stored in the repository. Run the
+generator to make it (section 12). The generator writes `levels.csv`.
+
+The same input files and the same seed always give the same file, byte for
+byte. Its SHA-256 is in
+[`test-plans/sdpa-fwd/levels.csv.sha256`](../../test-plans/sdpa-fwd/levels.csv.sha256).
+
+A CTest test, `hipdnn_sdpa_fwd_levels_regenerate_python_tests`, makes the CSV
+again and compares its SHA-256 with that file. When a change to the model, the
+timing files or the generator changes the CSV, write the new SHA-256 to that
+file in the same change.
+
+`levels.csv` has one row per case: 16,729 rows. It has no quoted fields. A `-`
+means that a child axis is not active in that row. Each row has 92 columns: 13
+case columns, then 79 axis columns.
 
 **Case columns (13).**
 
 | Column | Meaning |
 |---|---|
-| `case_id` | `lv-NNNN`. It changes on every regeneration. Do not use it as a key. |
+| `case_id` | `lv-NNNN`, the row number. A change to the model can shift it. Do not use it as a key. |
 | `level` | The tier: `quick`, `standard`, `comprehensive` or `full`. |
 | `shape_tier` | `S`, `H`, `M`, `L` or `X`. |
 | `origin` | `low-change`, `pairwise` (packed), `one-at-a-time`, `targeted` or `real_world`. |
@@ -384,17 +400,6 @@ means that a child axis is not active in that row.
 **Axis columns (79).** One column per model axis, from `batch_packing` to
 `runtime_shape_override`, in the order of `model.yaml`.
 
-**Appended columns (5).** These columns say what became of each row in the
-suite. Remove them and you get the generator's output byte for byte.
-
-| Column | Meaning |
-|---|---|
-| `topology` | The sweep folder name of the row (section 9). Every row has one. |
-| `bundle_status` | `bundle` or `excluded`. |
-| `exclusion_reasons` | For an excluded row: the reasons, joined with `;`. |
-| `bundle_path` | For a bundle row: `<tier>/SdpaFwdPlan/<Topology>`. |
-| `gtest_name` | For a bundle row: the GTest name that the suite gives the case. |
-
 ## 9. From rows to bundles
 
 A **bundle** is a graph test in `integration-test-bundles/`. A **sweep** is a
@@ -405,8 +410,8 @@ A **bundle** is a graph test in `integration-test-bundles/`. A **sweep** is a
 
 A bundle holds a graph and, for each case, a few fixed values. It cannot hold
 exact tensor contents. So a row that needs exact contents cannot be a bundle
-yet. It stays in the CSV, marked `excluded` with its reasons. A row can have
-several reasons.
+yet. It stays in the generated CSV, and the selection step (not in this
+repository) skips it for the reasons below. A row can have several reasons.
 
 | Reason | Why a bundle cannot express it | Rows |
 |---|---|---|
@@ -418,11 +423,12 @@ several reasons.
 | `descale_lists` | A per-head or finer descale is a list of factors in device memory. | 950 |
 | `tensor_overlap` | Two tensors that share memory need control of the pointers, which a bundle does not have. | 540 |
 | `arch_dtype` | The number format depends on the GPU (for example fp8 E4M3 becomes E4M3 FNUZ on gfx942), and one graph has one format. | 323 |
-| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change that is not on the base branch yet (PR #14709). Only the selection step removes these rows. | 182 (6 otherwise expressible) |
+| `zero_stride_needs_pr14709` | A zero stride on an input needs a data-SDK change that is not on the base branch yet (PR #14709). Only the selection step (not in this repository) removes these rows. | 182 (6 otherwise expressible) |
 | `dropout_without_rng_dump` | Random dropout without an `rng_dump` output has no oracle: the references check random dropout only through the dumped mask. | 44 (8 otherwise expressible) |
 
-9,883 rows became bundles. 6,846 rows are excluded. The selection step never
-changes the model or the CSV rows. It only filters. To bring a row back, change
+9,883 rows became bundles. 6,846 rows are excluded. The selection step (not in
+this repository) never
+changes the model or the generated rows. It only filters. To bring a row back, change
 the filter and regenerate the bundles.
 
 | Tier | All rows | Bundle rows | Sweeps | Largest sweep | Summed `est_seconds` of the bundle rows, gfx942 / gfx950 |
@@ -434,6 +440,10 @@ the filter and regenerate the bundles.
 | total | 16,729 | 9,883 | 293 | | |
 
 ### 9.2 How a graph is made from a row
+
+The PoC graph builder (not in this repository) makes the graphs. The
+`"generator": "hipdnn_sdpa_case_flow_runner"` field in each case's metadata
+names this graph builder.
 
 1. The PoC graph builder reads the row and the class-to-value table, and makes
    concrete sizes, strides, formats and attributes.
@@ -493,8 +503,15 @@ of `values` is on its own line, and each tensor is on its own line.
   `quick_SdpaFwdPlan_Base.bf16_e50bd5c4cdf64be7`.
 - **Metadata** of each case: `format_version`, `generator`,
   `generator_version`, `reference_source`, `seed`, `case_key`, `csv_case_id`
-  and `generated_from_sha256` (the sha256 of the CSV before the appended
-  columns). Use `case_key` to find the row in `cases.csv`.
+  and `generated_from_sha256` (the SHA-256 of the generated CSV). Use
+  `case_key` to find the row in the generated CSV (section 8).
+- **`cases.csv`**: `reference_source` names `test-plans/sdpa-fwd/cases.csv`.
+  That file is not in this repository. It is `levels.csv` with five columns
+  added at the end of each row: `topology`, `bundle_status`,
+  `exclusion_reasons`, `bundle_path` and `gtest_name`. Remove these five
+  columns and you get `levels.csv` byte for byte. Its rows have the same
+  `case_key` values as `levels.csv`, so `case_key` links each case to its
+  row in `levels.csv`.
 - **Seed**: the input seed of a case is the first 8 hex digits of its
   `case_key`, masked to 31 bits. Example: `case_key` `a69ef8a0…` gives seed
   0x269ef8a0 = 647,952,544.
@@ -515,43 +532,126 @@ decline them.
 
 ## 10. Known engine defects and their skips
 
-Some cases are accepted by `ASM_SDPA_ENGINE` but give a wrong output. An
-accepted case with a wrong output fails, whether or not a claim covers it. So
-each known defect gets a skip in
-[`ASM_SDPA_ENGINE.toml`](../../../hip-kernel-provider/config/ASM_SDPA_ENGINE.toml).
-The cases stay in their tier. Each skip's `reason` starts with a tag and a
-ticket key: `[SKIP-Tn] ALMIOPEN-NNNN: <defect>`.
+An engine can accept a case and then give a wrong output. The test of that
+case then fails. When the cause is a known engine **defect** (a bug), the case
+gets a **skip**: an entry in the engine's TOML file that tells the suite not to
+run the case. The case stays in its tier. This section tells how the skips for
+these cases were made, and how to remove them.
 
-| Tag | Ticket | Defect | Bundle rows that can reach it |
-|---|---|---|---|
-| `[SKIP-T2]` | ALMIOPEN-3042 | Zero or overlapping sequence strides on Q, K or V give a wrong O. | `strides_q`, `strides_k` or `strides_v` = `self_overlapping` |
-| `[SKIP-T3]` | ALMIOPEN-3042 | Stats is written with only the head stride. | `stats_output` = `requested` with non-packed `strides_stats` |
-| `[SKIP-T4]` | ALMIOPEN-3124 | Max and Sum_exp are accepted but never written. | `max_sumexp_output` other than `not_requested` |
-| `[SKIP-T5]` | ALMIOPEN-3125 | FP8_E4M3_FNUZ gives a wrong O on gfx942. | `dtype_q` = `fp8_e4m3_fnuz`, on gfx942 |
-| `[SKIP-T6]` | ALMIOPEN-3126 | The RNG dump is accepted at p = 0 but never written. | random dropout, `dropout_probability` = `zero`, `rng_dump` requested |
-| `[SKIP-T7]` | ALMIOPEN-3043 | A scale of zero or below gives NaN. | `scale_value` = `zero` or `negative` |
-| `[SKIP-T9]` | ALMIOPEN-3041 | Any head-dimension stride is accepted and read as 1. | No bundle row varies the head-dimension stride. |
+The skips are in
+[`ASM_SDPA_ENGINE.toml`](../../../hip-kernel-provider/config/ASM_SDPA_ENGINE.toml),
+after the comment line `-- SdpaFwdPlan known engine defects --`. Read that file
+for the current list. This document does not copy it.
 
-Other known defects that no bundle row reaches:
+### 10.1 Running the cases
 
-- ALMIOPEN-3123: a caller-supplied dropout mask is ignored. Rows with a
-  caller mask are excluded (`dropout_mask_cycle`).
-- ALMIOPEN-3127: a block mask is ignored. Rows with a block mask are excluded
-  (`block_mask_bits`).
-- ALMIOPEN-3128: a decline gives no reason. This is in the hipDNN backend; a
-  test cannot detect it.
+1. Run the `ASM_SDPA_ENGINE` lane of `hipdnn_integration_tests` (section 9.5)
+   on the `SdpaFwdPlan` cases of each tier, on a gfx942 GPU and on a gfx950 GPU.
+2. Run each tier two times, once with each **input fill**. The input fill is
+   how the suite makes the input data. The default fill makes large inputs on
+   the GPU. The host fill (`HIPDNN_TEST_HOST_INPUT_FILL=1`) makes every input on
+   the CPU ([Running Tests](../running-tests.md)). The two fills give different
+   data, and some defects show with one fill only.
+3. Record the result of each case on each GPU: `passed`, `declined` (the engine
+   does not accept the case), or `failed`.
 
-A skip runs before the support query, so a skipped case is never observed and
-never claimed. When a fix lands (the engine computes the case correctly, or
-declines it), the change that lands the fix deletes the matching skip entry.
+A case **fails** when an output tensor does not match the reference. A case
+also fails when the engine accepts it but no reference executor can check it.
+The suite calls this **unverifiable**.
+
+A case that failed with either fill counts as a failure.
+
+### 10.2 Tracing each failure to a ticket
+
+Each failure must have a known cause before it gets a skip.
+
+1. Find the case's row in the generated CSV with the `case_key` in the case's
+   metadata (section 9.4). The row gives every setting of the case.
+2. Read the failure message. It names each output tensor that does not match,
+   for example O, Stats, Max or Sum_exp.
+3. Compare the settings and the failing tensors with the known defects of the
+   engine. Each known defect has a **ticket**: a bug report in Jira, with a key
+   such as `ALMIOPEN-NNNN`. A defect also has a **trigger**: the settings that
+   make it occur, for example "Stats is requested with a layout that the kernel
+   cannot write".
+4. If no known defect explains the failure, find the cause in the engine code.
+   Then add the case to the ticket of that cause, or open a new ticket.
+
+Do not skip a failure that has no ticket.
+
+A case can have the triggers of more than one defect. A skip applies to the
+whole test, and the first entry that matches a test is the one that the suite
+uses. So such a case is skipped under one ticket only. Use the ticket of the
+defect that the failure message shows, for example the defect that makes the
+failing tensor wrong. The case still has its other defects. Section 10.4 tells
+what to do about them when a fix lands.
+
+### 10.3 Writing a skip entry
+
+A skip entry is a `[[test_skips]]` table
+([File Formats](../file-formats.md)). Write one entry for each defect and each
+set of GPUs. An entry has three fields:
+
+```toml
+# SdpaFwdPlan cases that <trigger, in a few words>.
+[[test_skips]]
+archs = ["gfx942", "gfx950"]
+filters = [
+    "<tier>_SdpaFwdPlan_<Topology>.*",
+    "<tier>_SdpaFwdPlan_<Topology>.<case id>",
+]
+reason = "ALMIOPEN-NNNN: <what the engine does wrong>"
+```
+
+- `archs`: the GPUs on which the failure was seen. Do not add a GPU on which
+  the case passed, or on which it was not run. The suite matches each value as
+  part of the GPU's architecture name, so `gfx942` matches
+  `gfx942:sramecc+:xnack-`.
+- `filters`: GTest names (section 9.4). A name can hold `*`, which matches any
+  run of characters. A name with `*` is a **glob**; a name without `*` is an
+  **exact name**.
+- `reason`: the text that the suite prints when it skips the case. Start it with
+  the ticket key, then a colon, then the defect in one short sentence. When a
+  second ticket blocks the check (for example, a reference executor cannot yet
+  check the case), name that ticket in the sentence too.
+
+Use a glob only when it is safe. A glob is safe when, on every GPU in `archs`,
+every case that it matches either failed with this defect or was declined.
+Otherwise, list exact names. Some defects give a wrong output only with some
+input data. For those defects, always list exact names: a glob could hide a case
+that passes.
+
+A glob also skips the declined cases that it matches. The suite then records no
+result for those cases on that GPU.
+
+Check the entries before you commit them. Apply the entries to the recorded
+results of section 10.1. Every failure must be skipped. No passing case may be
+skipped. Each skipped failure must be skipped under a ticket whose trigger the
+case has.
+
+### 10.4 Removing a skip when a fix lands
+
+1. When a fix for a ticket lands, find every entry whose `reason` starts with
+   that ticket key. Delete those entries in the change that lands the fix.
+2. Run the cases again on every GPU in the deleted entries' `archs`.
+3. A case that passes, or that the engine declines, needs nothing more.
+4. A case that still fails has another defect (section 10.2). Add it to the
+   entry for that defect's ticket, with the rules of section 10.3.
+
+Some known defects need a setting that no bundle can express, for example a
+caller-supplied dropout mask. Rows with such a setting are excluded
+(section 9.1), so these defects need no skip.
 
 ## 11. Limits and what comes next
 
 - The cases come from a PoC. The labels, the tier recipe and the budgets are a
   draft for review.
-- Only `ASM_SDPA_ENGINE` claims these cases, on gfx942 and gfx950 (Linux).
+- No **support claims** are recorded for these cases. A support claim is a
+  `support.json` file beside a sweep. It says that an engine supports a case on
+  a given GPU ([Support Matrix](../support-matrix.md)). Claims come in a later
+  change.
 - 6,846 rows are not bundles, mostly because they need exact tensor contents.
-  They stay in the CSV with their reasons.
+  They are rows of the generated CSV, but no bundle holds them.
 - The rejection probes and the API-path variants in `injections.yaml` are not
   bundles. They belong to a rejection suite.
 - A sweep of awkward sizes (sizes that do not fit tile edges) is not part of
@@ -561,31 +661,33 @@ declines it), the change that lands the fix deletes the matching skip entry.
 
 ## 12. How to regenerate
 
-The generator and the graph exporter are local PoC tools. They are not in the
-repository. These are the steps that made the committed files:
+**The CSV.** Run the generator from `dnn-providers/integration-tests/scripts`.
+It needs Python 3 and PyYAML. It takes about 3 minutes.
 
-1. **Rows and tiers.** The case generator reads `model.yaml`, `rules.yaml` and
-   `injections.yaml` with seed 2893. Its level step adds the tiers, with one
-   per-case timing file for gfx942 and one for gfx950. The output is the CSV
-   without the five appended columns.
-2. **Selection.** A filter applies the reasons of section 9.1. Two parameters
-   control which rows become bundles: the tiers that get bundles (default: all
-   four) and the smallest sweep size (default: 1). A switch controls the
-   zero-stride filter (default: on).
-3. **Graphs.** The PoC graph exporter writes one graph JSON and one metadata
-   JSON per selected row, with no GPU.
-4. **Bundles.** For each graph, sorted by tier, topology and `case_key`, run
-   `migration-scripts/import_graph.py` with `--tier <tier>`,
-   `--op-dir SdpaFwdPlan`, `--topology <Topology>`, `--case-id <id>`, and the
-   grouped-import flags of section 9.3.
-5. **CSV.** Append the five columns of section 8.
+```bash
+python3 -m sdpa_case_flow_poc.levels \
+    --model-dir ../test-plans/sdpa-fwd \
+    --out-dir <output folder> \
+    --seed 2893 \
+    --timings gfx942=../test-plans/sdpa-fwd/timings-gfx942.csv \
+    --timings gfx950=../test-plans/sdpa-fwd/timings-gfx950.csv
+```
 
-Checks:
+The generator writes `levels.csv` and `levels-summary.md` to the output folder.
+To check the result, compare the SHA-256 of `levels.csv` with
+`test-plans/sdpa-fwd/levels.csv.sha256`:
 
-- The generator output must equal `cases.csv` with the last five columns
-  removed, byte for byte.
-- Two bundle runs into two copies of the tree must give identical trees.
-- After a change to the bundle tree, run `scripts/verify_support_claims.py`
-  and regenerate `SUPPORT_MATRIX_OVERVIEW.md` with
-  `scripts/support_features/feature_matrix.py`
-  ([Support Matrix](../support-matrix.md)).
+```bash
+sha256sum <output folder>/levels.csv
+```
+
+The test `scripts/test_sdpa_fwd_levels_regenerate.py` runs these two steps.
+
+**The bundles.** The step that turns CSV rows into bundles (sections 9.1 to 9.4)
+is not part of this repository yet. The bundles under `SdpaFwdPlan` are
+committed as they are.
+
+After a change to the bundle tree, run `scripts/verify_support_claims.py` and
+regenerate `SUPPORT_MATRIX_OVERVIEW.md` with
+`scripts/support_features/feature_matrix.py`
+([Support Matrix](../support-matrix.md)).

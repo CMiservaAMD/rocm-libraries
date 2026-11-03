@@ -180,6 +180,17 @@ if(Python3_FOUND)
     )
     set(HIPDNN_IT_MIGRATION_SCRIPTS_TEST hipdnn_migration_scripts_python_tests)
 
+    # Skips itself (exit 77) when PyYAML, which the generator needs, is not installed.
+    add_test(
+        NAME hipdnn_sdpa_fwd_levels_regenerate_python_tests
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_sdpa_fwd_levels_regenerate.py
+                --work-dir ${CMAKE_CURRENT_BINARY_DIR}/sdpa-fwd-levels-regenerate
+    )
+    set_tests_properties(hipdnn_sdpa_fwd_levels_regenerate_python_tests
+                         PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 900)
+    set(HIPDNN_IT_SDPA_FWD_LEVELS_REGENERATE_TEST hipdnn_sdpa_fwd_levels_regenerate_python_tests)
+
     # pytest-style suites (fixtures, parametrize), so they run under -m pytest
     # rather than as scripts; a bare `python file.py` would collect nothing.
     add_test(
@@ -361,6 +372,9 @@ if(EXISTS "${HIPDNN_IT_GTEST_CATEGORIES_YAML}"
     endif()
     if(HIPDNN_IT_MIGRATION_SCRIPTS_TEST)
         _apply_provider_ctest_category_labels(${HIPDNN_IT_MIGRATION_SCRIPTS_TEST})
+    endif()
+    if(HIPDNN_IT_SDPA_FWD_LEVELS_REGENERATE_TEST)
+        _apply_provider_ctest_category_labels(${HIPDNN_IT_SDPA_FWD_LEVELS_REGENERATE_TEST})
     endif()
     if(HIPDNN_IT_BUNDLE_DISCOVERY_TEST)
         _apply_provider_ctest_category_labels(${HIPDNN_IT_BUNDLE_DISCOVERY_TEST})

@@ -15,7 +15,8 @@
 # selected by `ctest -L <tier>`, so it silently drops out of every check target.
 # Label them into the quick tier; the shared parser's tier cascade
 # (quick -> quick, standard, comprehensive, full) then runs them in every
-# cumulative check target.
+# cumulative check target. A check that takes minutes goes in the
+# comprehensive tier (comprehensive, full) instead.
 #
 # The patterns are exact CTest test names so they match only these pre-registered
 # tests.
@@ -39,6 +40,11 @@ test_categories:
       - "quick"
       - "pre-commit"
 
+  comprehensive:
+    description: "Pre-registered CTest checks that take minutes (case-list regeneration)"
+    test_patterns:
+      - "hipdnn_sdpa_fwd_levels_regenerate_python_tests"
+
   ffm-quick:
     description: "Fast-feedback mechanism (FFM) pre-registered CTest checks"
     test_patterns:
@@ -56,3 +62,8 @@ test_categories:
       - "hipdnn_golden_sdpa_fwd_paged_generator_python_tests"
     labels:
       - "ffm-full"
+
+  ffm-full:
+    description: "Fast-feedback mechanism (FFM) pre-registered CTest checks that take minutes"
+    test_patterns:
+      - "hipdnn_sdpa_fwd_levels_regenerate_python_tests"
