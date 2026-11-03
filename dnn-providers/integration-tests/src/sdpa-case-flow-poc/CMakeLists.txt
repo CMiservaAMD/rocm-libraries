@@ -3,7 +3,7 @@
 
 if(NOT HIPDNN_ENABLE_SDPA)
     message(FATAL_ERROR
-        "HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC needs hipDNN built with HIPDNN_ENABLE_SDPA=ON")
+        "HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_DISCOVERY needs hipDNN built with HIPDNN_ENABLE_SDPA=ON")
 endif()
 
 set(SDPA_CASE_FLOW_DISCOVERY_EXE hipdnn_sdpa_case_flow_discovery)

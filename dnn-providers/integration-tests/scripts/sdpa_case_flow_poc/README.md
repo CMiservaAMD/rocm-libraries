@@ -157,7 +157,7 @@ SDPA support. Two options, both off by default, add the PoC targets:
 | Option | Target |
 |---|---|
 | `HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER` | `hipdnn_sdpa_case_flow_runner` |
-| `HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC` | `hipdnn_sdpa_case_flow_discovery` |
+| `HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_DISCOVERY` | `hipdnn_sdpa_case_flow_discovery` |
 
 For example, with the repository superbuild:
 
@@ -166,7 +166,7 @@ cmake -S $REPO -B $BUILD -G Ninja -DCMAKE_BUILD_TYPE=Release \
     --toolchain $REPO/projects/hipdnn/cmake/ClangToolChain.cmake -DROCM_CMAKE_PATH=<ROCm root> \
     -DROCM_LIBS_ENABLE_COMPONENTS="hipdnn;hip-kernel-provider;hipdnn-integration-tests" \
     -DGPU_TARGETS="gfx942;gfx950" -DHIPDNN_ENABLE_SDPA=ON \
-    -DHIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER=ON -DHIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC=ON
+    -DHIPDNN_IT_ENABLE_SDPA_CASE_FLOW_RUNNER=ON -DHIPDNN_IT_ENABLE_SDPA_CASE_FLOW_DISCOVERY=ON
 cmake --build $BUILD --target hipdnn_sdpa_case_flow_runner hipdnn_sdpa_case_flow_discovery
 ```
 

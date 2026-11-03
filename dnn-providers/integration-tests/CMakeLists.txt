@@ -411,9 +411,9 @@ add_integration_test_target(${GOLDEN_DATA_TESTS_EXE} ${CMAKE_CURRENT_BINARY_DIR}
 
 add_subdirectory(src/integration-tests)
 
-option(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC
-       "Build the SDPA case-flow discovery driver (proof of concept, acceptance queries only)" OFF)
-if(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_POC)
+option(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_DISCOVERY
+       "Build the SDPA case-flow discovery tool (asks engines which cases they accept; runs nothing)" OFF)
+if(HIPDNN_IT_ENABLE_SDPA_CASE_FLOW_DISCOVERY)
     add_subdirectory(src/sdpa-case-flow-poc)
 endif()
 
